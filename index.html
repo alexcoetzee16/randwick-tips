@@ -3,23 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Randwick Championships Day 2 — Tipping Dashboard</title>
+<title>Randwick Championships Day 2 — Tipping</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --green:      #1a3d2b;
-    --gold:       #c9a84c;
-    --gold-lt:    #e8c96e;
-    --cream:      #f5f0e8;
-    --ink:        #1a1610;
-    --muted:      #7a7060;
-    --hit-bg:     rgba(255, 155, 50, 0.2);
-    --hit-border: rgba(255, 175, 75, 0.65);
+    --green:   #1a3d2b;
+    --gold:    #c9a84c;
+    --gold-lt: #e8c96e;
+    --cream:   #f5f0e8;
+    --ink:     #1a1610;
+    --muted:   #7a7060;
+    --hit-bg:     rgba(255,155,50,0.2);
+    --hit-border: rgba(255,175,75,0.65);
     --hit-text:   #ffbe6a;
   }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
+  * { box-sizing: border-box; margin:0; padding:0; }
   body {
     background: var(--green);
     color: var(--cream);
@@ -31,422 +30,314 @@
       repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
   }
 
+  /* ── HEADER ── */
   header {
     text-align: center;
-    padding: 2.2rem 2rem 1.2rem;
+    padding: 2rem 2rem 1.1rem;
     border-bottom: 1px solid rgba(201,168,76,0.3);
   }
-  header::before {
-    content: '🏇';
-    font-size: 2.5rem;
-    display: block;
-    margin-bottom: 0.4rem;
-    filter: drop-shadow(0 0 12px rgba(201,168,76,0.5));
-  }
-  header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(1.5rem, 4vw, 2.6rem);
-    font-weight: 900;
-    color: var(--gold);
-    letter-spacing: 0.02em;
-    line-height: 1.1;
-  }
-  header h1 span { color: var(--cream); }
-  header p {
-    margin-top: 0.35rem;
-    font-size: 0.8rem;
-    color: var(--muted);
-    font-family: 'DM Mono', monospace;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
+  header::before { content:'🏇'; font-size:2.4rem; display:block; margin-bottom:0.4rem; filter:drop-shadow(0 0 12px rgba(201,168,76,0.5)); }
+  header h1 { font-family:'Playfair Display',serif; font-size:clamp(1.4rem,4vw,2.5rem); font-weight:900; color:var(--gold); letter-spacing:0.02em; line-height:1.1; }
+  header h1 span { color:var(--cream); }
+  header p { margin-top:0.3rem; font-size:0.78rem; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:0.08em; text-transform:uppercase; }
 
+  /* ── CONNECTION STATUS ── */
+  #conn-bar {
+    text-align:center; padding:0.4rem 1rem;
+    font-family:'DM Mono',monospace; font-size:0.7rem; letter-spacing:0.05em; text-transform:uppercase;
+    transition: background 0.3s;
+  }
+  #conn-bar.connecting { background:rgba(201,168,76,0.12); color:var(--gold); }
+  #conn-bar.connected  { background:rgba(34,120,60,0.2);   color:#7fffaa; }
+  #conn-bar.error      { background:rgba(139,32,32,0.3);   color:#ffaaaa; }
+
+  /* ── JOIN OVERLAY ── */
+  #join-overlay {
+    position:fixed; inset:0; background:rgba(10,30,18,0.92);
+    display:flex; align-items:center; justify-content:center;
+    z-index:100; backdrop-filter:blur(4px);
+  }
+  .join-box {
+    background: linear-gradient(145deg, #1f4a33, #162e20);
+    border:1px solid rgba(201,168,76,0.35);
+    border-radius:16px; padding:2.5rem 2rem; text-align:center;
+    max-width:340px; width:90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .join-box h2 { font-family:'Playfair Display',serif; font-size:1.5rem; color:var(--gold); margin-bottom:0.4rem; }
+  .join-box p  { font-size:0.82rem; color:var(--muted); margin-bottom:1.4rem; line-height:1.5; }
+  .join-box select {
+    width:100%; padding:0.65rem 1rem; border-radius:8px;
+    background:rgba(255,255,255,0.07); border:1px solid rgba(201,168,76,0.35);
+    color:var(--cream); font-family:'DM Sans',sans-serif; font-size:1rem;
+    outline:none; text-align:center; margin-bottom:1rem; cursor:pointer;
+    appearance:none; -webkit-appearance:none;
+  }
+  .join-box select:focus { border-color:var(--gold); }
+  .join-box select option { background:#1a3d2b; color:var(--cream); }
+  .join-box button {
+    width:100%; padding:0.7rem; border-radius:30px;
+    background:var(--gold); color:var(--ink);
+    font-family:'DM Sans',sans-serif; font-size:0.95rem; font-weight:700;
+    border:none; cursor:pointer; transition:opacity 0.15s;
+  }
+  .join-box button:hover { opacity:0.88; }
+  .join-box .join-err { color:#ff9999; font-size:0.78rem; margin-top:0.5rem; min-height:1.1em; }
+
+  /* ── META BAR ── */
   .meta-bar {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.4rem 2rem;
-    padding: 0.75rem 2rem;
-    border-bottom: 1px solid rgba(201,168,76,0.15);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:0.4rem 2rem;
+    padding:0.7rem 2rem; border-bottom:1px solid rgba(201,168,76,0.15);
+    font-family:'DM Mono',monospace; font-size:0.76rem; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.06em;
   }
-  .meta-item strong { color: var(--gold-lt); }
+  .meta-item strong { color:var(--gold-lt); }
   .meta-item input[type="number"] {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(201,168,76,0.3);
-    color: var(--gold-lt);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    width: 56px;
-    padding: 2px 5px;
-    border-radius: 4px;
-    text-align: center;
-    outline: none;
+    background:rgba(255,255,255,0.07); border:1px solid rgba(201,168,76,0.3);
+    color:var(--gold-lt); font-family:'DM Mono',monospace; font-size:0.76rem;
+    width:52px; padding:2px 5px; border-radius:4px; text-align:center; outline:none;
   }
 
+  /* ── SCORING KEY ── */
   .scoring-key {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.35rem 1.2rem;
-    padding: 0.55rem 1rem;
-    background: rgba(0,0,0,0.18);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.67rem;
-    color: var(--muted);
+    display:flex; flex-wrap:wrap; justify-content:center; gap:0.3rem 1.1rem;
+    padding:0.5rem 1rem; background:rgba(0,0,0,0.18);
+    border-bottom:1px solid rgba(255,255,255,0.05);
+    font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted);
   }
-  .scoring-key span strong { color: var(--gold-lt); }
+  .scoring-key span strong { color:var(--gold-lt); }
 
+  /* ── STATS BANNER ── */
   .pot-banner {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 1.5rem;
-    padding: 0.85rem 2rem;
-    background: rgba(0,0,0,0.2);
-    border-bottom: 1px solid rgba(201,168,76,0.12);
+    display:flex; flex-wrap:wrap; justify-content:center; gap:1.5rem;
+    padding:0.8rem 2rem; background:rgba(0,0,0,0.2);
+    border-bottom:1px solid rgba(201,168,76,0.12);
   }
-  .stat-block { text-align: center; }
-  .stat-block .val {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.3rem;
-    color: var(--gold);
-    font-weight: 700;
-    line-height: 1;
+  .stat-block { text-align:center; }
+  .stat-block .val { font-family:'Playfair Display',serif; font-size:1.25rem; color:var(--gold); font-weight:700; line-height:1; }
+  .stat-block .lbl { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em; margin-top:2px; }
+
+  /* ── MY NAME TAG ── */
+  #my-name-tag {
+    text-align:center; padding:0.45rem 1rem;
+    font-family:'DM Mono',monospace; font-size:0.7rem; color:var(--muted);
+    border-bottom:1px solid rgba(255,255,255,0.05);
   }
-  .stat-block .lbl {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.61rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-top: 2px;
+  #my-name-tag strong { color:var(--gold-lt); }
+  #my-name-tag button {
+    margin-left:0.8rem; background:transparent; border:none;
+    color:var(--muted); font-size:0.68rem; cursor:pointer; text-decoration:underline;
+    font-family:'DM Mono',monospace;
   }
 
-  .scroll-wrap {
-    overflow-x: auto;
-    padding: 1.2rem 1rem 0.5rem;
-  }
-
-  table {
-    border-collapse: collapse;
-    min-width: 960px;
-    width: 100%;
-  }
+  /* ── SCROLL / TABLE ── */
+  .scroll-wrap { overflow-x:auto; padding:1.1rem 1rem 0.5rem; }
+  table { border-collapse:collapse; min-width:960px; width:100%; }
 
   thead tr.race-header th {
-    font-family: 'Playfair Display', serif;
-    font-size: 0.75rem;
-    color: var(--gold);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 0.5rem 0.35rem 0.2rem;
-    text-align: center;
-    border-bottom: 2px solid rgba(201,168,76,0.35);
-    white-space: nowrap;
-    vertical-align: bottom;
+    font-family:'Playfair Display',serif; font-size:0.73rem; color:var(--gold);
+    text-transform:uppercase; letter-spacing:0.05em;
+    padding:0.5rem 0.32rem 0.2rem; text-align:center;
+    border-bottom:2px solid rgba(201,168,76,0.35); white-space:nowrap; vertical-align:bottom;
   }
   thead tr.race-header th.player-col {
-    text-align: left;
-    color: var(--cream);
-    font-family: 'DM Sans', sans-serif;
-    font-weight: 500;
-    font-size: 0.7rem;
-    min-width: 115px;
-    padding-left: 0.8rem;
+    text-align:left; color:var(--cream); font-family:'DM Sans',sans-serif;
+    font-weight:500; font-size:0.68rem; min-width:115px; padding-left:0.8rem;
   }
-  thead tr.race-header th .race-num {
-    display: block;
-    font-size: 1rem;
-    font-weight: 900;
-    line-height: 1;
-    margin-bottom: 1px;
-  }
-  thead tr.race-header th .race-time {
-    display: block;
-    font-size: 0.55rem;
-    font-family: 'DM Mono', monospace;
-    color: rgba(201,168,76,0.5);
-    font-weight: 400;
-  }
-  thead tr.race-header th.total-col {
-    color: var(--gold-lt);
-    font-weight: 900;
-    font-size: 0.72rem;
-    min-width: 75px;
-  }
+  thead tr.race-header th .race-num { display:block; font-size:0.98rem; font-weight:900; line-height:1; margin-bottom:1px; }
+  thead tr.race-header th .race-time { display:block; font-size:0.53rem; font-family:'DM Mono',monospace; color:rgba(201,168,76,0.5); }
+  thead tr.race-header th.total-col { color:var(--gold-lt); font-weight:900; font-size:0.7rem; min-width:72px; }
 
-  thead tr.race-names th {
-    padding: 0.15rem 0.35rem 0.45rem;
-    text-align: center;
-  }
-  thead tr.race-names th.name-edit input {
-    background: transparent;
-    border: none;
-    border-bottom: 1px dashed rgba(201,168,76,0.22);
-    color: rgba(201,168,76,0.7);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.55rem;
-    width: 82px;
-    text-align: center;
-    outline: none;
-  }
-  thead tr.race-names th.name-edit input:focus { border-bottom-color: var(--gold); }
+  thead tr.race-names th { padding:0.12rem 0.32rem 0.4rem; text-align:center; }
+  thead tr.race-names th.name-edit { font-family:'DM Mono',monospace; font-size:0.54rem; color:rgba(201,168,76,0.6); }
 
-  tbody tr.player-row {
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    transition: background 0.12s;
-  }
-  tbody tr.player-row:hover { background: rgba(255,255,255,0.025); }
+  tbody tr.player-row { border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.12s; }
+  tbody tr.player-row:hover { background:rgba(255,255,255,0.02); }
+  tbody tr.player-row.is-me { background:rgba(201,168,76,0.05); }
 
-  tbody td {
-    padding: 0.3rem 0.28rem;
-    text-align: center;
-    vertical-align: middle;
-  }
-  tbody td.player-name {
-    text-align: left;
-    padding-left: 0.8rem;
-    font-weight: 500;
-    font-size: 0.82rem;
-    white-space: nowrap;
-  }
-  tbody td.player-name input {
-    background: transparent;
-    border: none;
-    border-bottom: 1px dashed rgba(201,168,76,0.28);
-    color: var(--cream);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 500;
-    width: 108px;
-    outline: none;
-    padding: 2px 0;
-  }
-  tbody td.player-name input:focus { border-bottom-color: var(--gold); }
+  tbody td { padding:0.28rem 0.26rem; text-align:center; vertical-align:middle; }
+  tbody td.player-name { text-align:left; padding-left:0.8rem; font-weight:500; font-size:0.8rem; white-space:nowrap; }
 
-  /* ── PICK CELLS ── */
-  .pick-cell { position: relative; padding: 0.3rem 0.28rem; }
-
+  /* Pick cells */
+  .pick-cell { position:relative; padding:0.28rem 0.26rem; }
   .pick-cell input.horse-pick {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 5px;
-    color: var(--cream);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.7rem;
-    width: 82px;
-    padding: 4px 5px;
-    text-align: center;
-    outline: none;
-    display: block;
-    transition: border-color 0.15s, background 0.15s;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+    border-radius:5px; color:var(--cream); font-family:'DM Sans',sans-serif;
+    font-size:0.68rem; width:82px; padding:4px 5px; text-align:center;
+    outline:none; display:block;
+    transition:border-color 0.15s, background 0.15s;
   }
-  .pick-cell input.horse-pick:focus {
-    border-color: rgba(201,168,76,0.5);
-    background: rgba(201,168,76,0.06);
+  .pick-cell input.horse-pick:focus { border-color:rgba(201,168,76,0.5); background:rgba(201,168,76,0.06); }
+  .pick-cell input.horse-pick:disabled { opacity:0.45; cursor:not-allowed; }
+
+  /* HIT */
+  .pick-cell.hit { background:var(--hit-bg); border-radius:6px; animation:flash-hit 0.55s ease-out; }
+  .pick-cell.hit input.horse-pick { background:rgba(255,155,50,0.15); border-color:var(--hit-border); color:var(--hit-text); font-weight:700; }
+  .pts-badge { display:none; font-family:'DM Mono',monospace; font-size:0.61rem; color:var(--hit-text); font-weight:700; text-align:center; margin-top:3px; }
+  .pick-cell.hit .pts-badge { display:block; }
+
+  /* read-only pick (other players) */
+  .pick-readonly {
+    font-family:'DM Sans',sans-serif; font-size:0.68rem; color:var(--cream);
+    background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.07);
+    border-radius:5px; padding:4px 5px; display:block; width:82px;
+    text-align:center; min-height:24px; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;
   }
 
-  /* HIT — picked the winner */
-  .pick-cell.hit {
-    background: var(--hit-bg);
-    border-radius: 7px;
-    animation: flash-hit 0.55s ease-out;
-  }
-  .pick-cell.hit input.horse-pick {
-    background: rgba(255,155,50,0.15);
-    border-color: var(--hit-border);
-    color: var(--hit-text);
-    font-weight: 700;
-  }
-  .pts-badge {
-    display: none;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.63rem;
-    color: var(--hit-text);
-    font-weight: 700;
-    text-align: center;
-    margin-top: 3px;
-    letter-spacing: 0.02em;
-  }
-  .pick-cell.hit .pts-badge { display: block; }
+  @keyframes flash-hit { 0%{background:rgba(255,180,60,0.55);} 100%{background:var(--hit-bg);} }
 
-  @keyframes flash-hit {
-    0%   { background: rgba(255,180,60,0.55); }
-    100% { background: var(--hit-bg); }
-  }
+  td.total-cell { font-family:'DM Mono',monospace; font-size:0.86rem; font-weight:700; color:var(--gold-lt); min-width:72px; transition:color 0.3s, text-shadow 0.3s; }
+  td.total-cell.leader { color:#7fffaa; text-shadow:0 0 14px rgba(127,255,170,0.45); }
 
-  td.total-cell {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--gold-lt);
-    min-width: 75px;
-    letter-spacing: 0.02em;
-    transition: color 0.3s, text-shadow 0.3s;
-  }
-  td.total-cell.leader {
-    color: #7fffaa;
-    text-shadow: 0 0 14px rgba(127,255,170,0.45);
-  }
-
-  /* ── WINNER ROW ── */
-  tbody tr.winner-row {
-    border-top: 2px solid rgba(201,168,76,0.45);
-    background: rgba(0,0,0,0.28);
-  }
-  tbody tr.winner-row td { padding: 0.5rem 0.28rem; }
+  /* Winner row */
+  tbody tr.winner-row { border-top:2px solid rgba(201,168,76,0.45); background:rgba(0,0,0,0.28); }
+  tbody tr.winner-row td { padding:0.45rem 0.26rem; }
   tbody tr.winner-row td.winner-label {
-    text-align: left;
-    padding-left: 0.8rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.63rem;
-    color: var(--gold);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    white-space: nowrap;
+    text-align:left; padding-left:0.8rem;
+    font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--gold);
+    text-transform:uppercase; letter-spacing:0.08em; white-space:nowrap;
   }
-
-  .winner-cell { text-align: center; }
+  .winner-cell { text-align:center; }
   .winner-cell input.winner-horse {
-    background: rgba(201,168,76,0.09);
-    border: 1px solid rgba(201,168,76,0.38);
-    border-radius: 5px;
-    color: var(--gold-lt);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.7rem;
-    width: 82px;
-    padding: 4px 5px;
-    text-align: center;
-    outline: none;
-    display: block;
-    font-weight: 600;
-    margin: 0 auto;
-    transition: border-color 0.15s;
+    background:rgba(201,168,76,0.09); border:1px solid rgba(201,168,76,0.38);
+    border-radius:5px; color:var(--gold-lt); font-family:'DM Sans',sans-serif;
+    font-size:0.68rem; width:82px; padding:4px 5px; text-align:center;
+    outline:none; display:block; font-weight:600; margin:0 auto;
   }
-  .winner-cell input.winner-horse:focus { border-color: var(--gold); }
-  .winner-cell input.winner-horse::placeholder { color: rgba(201,168,76,0.3); font-style: italic; font-weight: 400; }
-
+  .winner-cell input.winner-horse:disabled { opacity:0.45; cursor:not-allowed; }
+  .winner-cell input.winner-horse::placeholder { color:rgba(201,168,76,0.28); font-style:italic; font-weight:400; }
   .winner-cell input.winner-sp {
-    background: transparent;
-    border: none;
-    border-bottom: 1px dashed rgba(201,168,76,0.4);
-    color: var(--gold);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.67rem;
-    width: 52px;
-    text-align: center;
-    outline: none;
-    margin: 3px auto 0;
-    display: block;
-    font-weight: 600;
+    background:transparent; border:none; border-bottom:1px dashed rgba(201,168,76,0.4);
+    color:var(--gold); font-family:'DM Mono',monospace; font-size:0.65rem;
+    width:52px; text-align:center; outline:none; margin:3px auto 0; display:block; font-weight:600;
   }
-  .winner-cell input.winner-sp:focus { border-bottom-color: var(--gold); }
-  .winner-cell input.winner-sp::placeholder { color: rgba(201,168,76,0.28); font-style: italic; }
+  .winner-cell input.winner-sp:disabled { opacity:0.45; cursor:not-allowed; }
+  .winner-cell input.winner-sp::placeholder { color:rgba(201,168,76,0.25); font-style:italic; }
+  .pts-formula { font-family:'DM Mono',monospace; font-size:0.55rem; color:rgba(201,168,76,0.4); text-align:center; margin-top:2px; min-height:9px; }
 
-  .pts-formula {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.57rem;
-    color: rgba(201,168,76,0.42);
-    text-align: center;
-    margin-top: 2px;
-    min-height: 10px;
-  }
+  /* Leaderboard */
+  .leaderboard { max-width:500px; margin:1.4rem auto 2rem; padding:0 1rem; }
+  .leaderboard h2 { font-family:'Playfair Display',serif; font-size:1.05rem; color:var(--gold); text-align:center; margin-bottom:0.65rem; letter-spacing:0.04em; }
+  .lb-row { display:flex; align-items:center; gap:0.55rem; padding:0.45rem 0.8rem; border-radius:8px; margin-bottom:0.24rem; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); }
+  .lb-row.rank-1 { background:rgba(201,168,76,0.11); border-color:rgba(201,168,76,0.28); }
+  .lb-rank { font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted); width:18px; text-align:right; flex-shrink:0; }
+  .lb-row.rank-1 .lb-rank { color:var(--gold); font-weight:700; }
+  .lb-trophy { font-size:0.92rem; flex-shrink:0; width:18px; }
+  .lb-name { flex:1; font-size:0.83rem; font-weight:500; }
+  .lb-wins { font-size:0.66rem; color:var(--muted); font-family:'DM Mono',monospace; }
+  .lb-score { font-family:'DM Mono',monospace; font-size:0.88rem; color:var(--gold-lt); font-weight:700; }
+  .lb-payout { font-size:0.66rem; color:#7fffaa; font-family:'DM Mono',monospace; font-weight:700; }
 
-  /* ── LEADERBOARD ── */
-  .leaderboard {
-    max-width: 500px;
-    margin: 1.5rem auto 2rem;
-    padding: 0 1rem;
-  }
-  .leaderboard h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.1rem;
-    color: var(--gold);
-    text-align: center;
-    margin-bottom: 0.7rem;
-    letter-spacing: 0.04em;
-  }
-  .lb-row {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.48rem 0.8rem;
-    border-radius: 8px;
-    margin-bottom: 0.26rem;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .lb-row.rank-1 { background: rgba(201,168,76,0.11); border-color: rgba(201,168,76,0.28); }
-  .lb-rank { font-family: 'DM Mono', monospace; font-size: 0.66rem; color: var(--muted); width: 18px; text-align: right; flex-shrink: 0; }
-  .lb-row.rank-1 .lb-rank { color: var(--gold); font-weight: 700; }
-  .lb-trophy { font-size: 0.95rem; flex-shrink: 0; width: 18px; }
-  .lb-name { flex: 1; font-size: 0.84rem; font-weight: 500; }
-  .lb-wins { font-size: 0.68rem; color: var(--muted); font-family: 'DM Mono', monospace; }
-  .lb-score { font-family: 'DM Mono', monospace; font-size: 0.9rem; color: var(--gold-lt); font-weight: 700; }
-  .lb-payout { font-size: 0.68rem; color: #7fffaa; font-family: 'DM Mono', monospace; font-weight: 700; }
+  /* Controls */
+  .controls { display:flex; flex-wrap:wrap; justify-content:center; gap:0.45rem; padding:0.4rem 1rem 1.1rem; }
+  button { font-family:'DM Sans',sans-serif; font-size:0.76rem; padding:0.4rem 0.95rem; border-radius:20px; border:none; cursor:pointer; transition:opacity 0.15s, transform 0.1s; font-weight:500; }
+  button:hover { opacity:0.85; transform:translateY(-1px); }
+  button:active { transform:translateY(0); }
+  .btn-primary { background:var(--gold); color:var(--ink); }
+  .btn-ghost { background:transparent; border:1px solid rgba(201,168,76,0.38); color:var(--gold-lt); }
+  .btn-danger { background:rgba(139,32,32,0.65); border:1px solid rgba(200,60,60,0.35); color:#ffaaaa; }
+  .btn-admin { background:rgba(80,40,120,0.6); border:1px solid rgba(150,100,200,0.4); color:#d4b8ff; }
 
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem 1.2rem;
+  /* Admin pin overlay */
+  #admin-overlay {
+    position:fixed; inset:0; background:rgba(10,30,18,0.92);
+    display:none; align-items:center; justify-content:center; z-index:200;
   }
-  button {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem;
-    padding: 0.42rem 1rem;
-    border-radius: 20px;
-    border: none;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    font-weight: 500;
+  #admin-overlay.show { display:flex; }
+  .admin-box {
+    background:linear-gradient(145deg,#1f4a33,#162e20); border:1px solid rgba(150,100,200,0.4);
+    border-radius:14px; padding:2rem; text-align:center; max-width:300px; width:90%;
   }
-  button:hover { opacity: 0.85; transform: translateY(-1px); }
-  button:active { transform: translateY(0); }
-  .btn-primary { background: var(--gold); color: var(--ink); }
-  .btn-ghost { background: transparent; border: 1px solid rgba(201,168,76,0.38); color: var(--gold-lt); }
-  .btn-danger { background: rgba(139,32,32,0.65); border: 1px solid rgba(200,60,60,0.35); color: #ffaaaa; }
+  .admin-box h3 { font-family:'Playfair Display',serif; font-size:1.2rem; color:#d4b8ff; margin-bottom:0.5rem; }
+  .admin-box p { font-size:0.78rem; color:var(--muted); margin-bottom:1rem; }
+  .admin-box input { width:100%; padding:0.55rem 1rem; border-radius:8px; background:rgba(255,255,255,0.07); border:1px solid rgba(150,100,200,0.35); color:var(--cream); font-size:1rem; text-align:center; outline:none; margin-bottom:0.8rem; letter-spacing:0.2em; font-family:'DM Mono',monospace; }
+  .admin-box .err { color:#ff9999; font-size:0.75rem; margin-top:0.3rem; }
+  .admin-btns { display:flex; gap:0.5rem; }
+  .admin-btns button { flex:1; }
 
-  ::-webkit-scrollbar { height: 5px; }
-  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); }
-  ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.28); border-radius: 3px; }
+  ::-webkit-scrollbar { height:5px; }
+  ::-webkit-scrollbar-track { background:rgba(255,255,255,0.04); }
+  ::-webkit-scrollbar-thumb { background:rgba(201,168,76,0.28); border-radius:3px; }
+
+  .sync-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#7fffaa; margin-right:5px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 </style>
 </head>
 <body>
+
+<!-- JOIN OVERLAY -->
+<div id="join-overlay">
+  <div class="join-box">
+    <h2>🏇 Join the Comp</h2>
+    <p>Pick your name to claim your row and start tipping.</p>
+    <select id="join-name">
+      <option value="">— Select your name —</option>
+      <option>AC</option>
+      <option>Timbo</option>
+      <option>Tahir</option>
+      <option>Jeffs</option>
+      <option>Page</option>
+      <option>Cal</option>
+      <option>Bish</option>
+      <option>George</option>
+      <option>Les</option>
+      <option>Josh</option>
+      <option>Liam</option>
+      <option>Brandon</option>
+    </select>
+    <button onclick="joinComp()">Join & Start Tipping</button>
+    <div class="join-err" id="join-err"></div>
+  </div>
+</div>
+
+<!-- ADMIN PIN OVERLAY -->
+<div id="admin-overlay">
+  <div class="admin-box">
+    <h3>🔐 Admin Access</h3>
+    <p>Enter the admin PIN to enter race results</p>
+    <input type="password" id="admin-pin-input" placeholder="PIN" maxlength="6" />
+    <div class="err" id="admin-err"></div>
+    <div class="admin-btns">
+      <button class="btn-ghost" onclick="closeAdminOverlay()">Cancel</button>
+      <button class="btn-admin" onclick="checkAdminPin()">Unlock</button>
+    </div>
+  </div>
+</div>
 
 <header>
   <h1>Royal Randwick <span>Championships</span></h1>
   <p>Day 2 · Saturday 11 April 2026 · Tipping Competition</p>
 </header>
 
+<div id="conn-bar" class="connecting">⟳ Connecting…</div>
+
+<div id="my-name-tag" style="display:none">
+  Tipping as <strong id="my-name-display"></strong>
+  <button onclick="changeName()">change</button>
+</div>
+
 <div class="meta-bar">
   <span class="meta-item">Buy-in: $<input type="number" id="buyin" value="25" min="1" max="500"> per person</span>
-  <span class="meta-item">Total Pot: <strong id="pot-val">$300</strong></span>
+  <span class="meta-item">Total Pot: <strong id="pot-val">—</strong></span>
   <span class="meta-item">10 Races · First Race 11:45am</span>
 </div>
 
 <div class="scoring-key">
   <span>Scoring: <strong>SP odds × 100 pts</strong></span>
-  <span>$2.00 → <strong>200 pts</strong></span>
-  <span>$5.00 → <strong>500 pts</strong></span>
-  <span>$10.00 → <strong>1,000 pts</strong></span>
-  <span>$20.00 → <strong>2,000 pts</strong></span>
-  <span>$50.00 → <strong>5,000 pts</strong></span>
+  <span>$2 → <strong>200 pts</strong></span>
+  <span>$5 → <strong>500 pts</strong></span>
+  <span>$10 → <strong>1,000 pts</strong></span>
+  <span>$20 → <strong>2,000 pts</strong></span>
+  <span>$50 → <strong>5,000 pts</strong></span>
 </div>
 
 <div class="pot-banner">
-  <div class="stat-block"><div class="val" id="stat-pot">$300</div><div class="lbl">Total Pot</div></div>
-  <div class="stat-block"><div class="val" id="stat-players">12</div><div class="lbl">Players</div></div>
+  <div class="stat-block"><div class="val" id="stat-pot">—</div><div class="lbl">Total Pot</div></div>
+  <div class="stat-block"><div class="val" id="stat-players">—</div><div class="lbl">Players</div></div>
   <div class="stat-block"><div class="val" id="stat-leader">—</div><div class="lbl">Leader</div></div>
   <div class="stat-block"><div class="val" id="stat-score">—</div><div class="lbl">Top Score</div></div>
-  <div class="stat-block"><div class="val" id="stat-races">0 / 10</div><div class="lbl">Races Done</div></div>
+  <div class="stat-block"><div class="val" id="stat-races">0/10</div><div class="lbl">Races Done</div></div>
 </div>
 
 <div class="scroll-wrap">
@@ -466,10 +357,8 @@
 </div>
 
 <div class="controls">
-  <button class="btn-primary" onclick="addPlayer()">+ Add Player</button>
-  <button class="btn-ghost"   onclick="saveState()">💾 Save</button>
-  <button class="btn-ghost"   onclick="loadState()">📂 Load</button>
-  <button class="btn-danger"  onclick="resetAll()">Reset All</button>
+  <button class="btn-admin" onclick="openAdminOverlay()">🔐 Enter Results</button>
+  <button class="btn-ghost"  onclick="toggleBuyinEdit()">💰 Edit Buy-in</button>
 </div>
 
 <div class="leaderboard">
@@ -478,276 +367,318 @@
 </div>
 
 <script>
+// ── CONFIG ─────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://etffvtemqdoefiwblweb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_oT3lxOWJP9yIVVp6V8OBdw_oMj0c-ao';
+const ADMIN_PIN    = '1234'; // ← CHANGE THIS before sharing the link
+
 const RACES = [
-  { num:1,  name:"Race 1",        time:"11:45" },
-  { num:2,  name:"Race 2",        time:"12:25" },
-  { num:3,  name:"Percy Sykes",   time:"13:05" },
-  { num:4,  name:"Race 4",        time:"13:45" },
-  { num:5,  name:"ATC Oaks",      time:"14:25" },
-  { num:6,  name:"Race 6",        time:"15:05" },
-  { num:7,  name:"Sydney Cup",    time:"15:45" },
-  { num:8,  name:"Queen of Turf", time:"16:20" },
-  { num:9,  name:"Queen Eliz.",   time:"16:55" },
-  { num:10, name:"Race 10",       time:"17:10" },
+  { num:1,  name:'Race 1',        time:'11:45' },
+  { num:2,  name:'Race 2',        time:'12:25' },
+  { num:3,  name:'Percy Sykes',   time:'13:05' },
+  { num:4,  name:'Race 4',        time:'13:45' },
+  { num:5,  name:'ATC Oaks',      time:'14:25' },
+  { num:6,  name:'Race 6',        time:'15:05' },
+  { num:7,  name:'Sydney Cup',    time:'15:45' },
+  { num:8,  name:'Queen of Turf', time:'16:20' },
+  { num:9,  name:'Queen Eliz.',   time:'16:55' },
+  { num:10, name:'Race 10',       time:'17:10' },
 ];
 
-const DEFAULT_PLAYERS = [
-  "Player 1","Player 2","Player 3","Player 4","Player 5","Player 6",
-  "Player 7","Player 8","Player 9","Player 10","Player 11","Player 12"
-];
-
-let state = { players:[], picks:[], results:[], raceNames:[] };
-
-function initState() {
-  state.players   = DEFAULT_PLAYERS.slice();
-  state.picks     = state.players.map(() => RACES.map(() => ({ horse:"" })));
-  state.results   = RACES.map(() => ({ winner:"", sp:"" }));
-  state.raceNames = RACES.map(r => r.name);
-}
+// ── STATE ──────────────────────────────────────────────────────────────────
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let myName    = localStorage.getItem('randwick_name') || '';
+let isAdmin   = false;
+let tippers   = [];   // [{ id, name, picks: [...10 strings] }]
+let results   = [];   // [{ race_num, winner, sp }]
+let saveTimers = {};  // debounce per player
 
 // ── SCORING ───────────────────────────────────────────────────────────────
-function spToPoints(sp) {
-  const v = parseFloat(sp);
-  return isNaN(v) || v <= 0 ? 0 : Math.round(v * 100);
-}
-function norm(s) { return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
-function isHit(pick, winner) { return !!(pick && winner && norm(pick) === norm(winner)); }
-
-function playerPoints(pi) {
-  return state.results.reduce((sum, res, ri) => {
-    if (!res.winner || !res.sp) return sum;
-    return sum + (isHit(state.picks[pi][ri].horse, res.winner) ? spToPoints(res.sp) : 0);
+function spToPoints(sp) { const v=parseFloat(sp); return isNaN(v)||v<=0?0:Math.round(v*100); }
+function norm(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function isHit(pick,winner) { return !!(pick&&winner&&norm(pick)===norm(winner)); }
+function playerPoints(picks) {
+  return results.reduce((sum,res,ri) => {
+    if (!res||!res.winner||!res.sp) return sum;
+    return sum + (isHit(picks[ri], res.winner) ? spToPoints(res.sp) : 0);
   }, 0);
 }
-function playerWins(pi) {
-  return state.results.filter((res,ri) => res.winner && isHit(state.picks[pi][ri].horse, res.winner)).length;
+function playerWins(picks) {
+  return results.filter((res,ri)=>res&&res.winner&&isHit(picks[ri],res.winner)).length;
 }
 
-// ── BUILD HEADER ──────────────────────────────────────────────────────────
+// ── JOIN / NAME ────────────────────────────────────────────────────────────
+function showJoin() { document.getElementById('join-overlay').style.display='flex'; }
+function hideJoin() { document.getElementById('join-overlay').style.display='none'; }
+
+async function joinComp() {
+  const name = document.getElementById('join-name').value.trim();
+  const err  = document.getElementById('join-err');
+  if (!name) { err.textContent='Please select your name.'; return; }
+
+  // Already exists — just rejoin
+  const existing = tippers.find(t => norm(t.name)===norm(name));
+  if (existing) {
+    myName = existing.name;
+    localStorage.setItem('randwick_name', myName);
+    hideJoin(); updateMyTag(); render(); return;
+  }
+
+  // Create new row
+  const { error } = await sb.from('tippers').insert({ name: name, picks: Array(10).fill('') });
+  if (error) { err.textContent='Error: '+error.message; return; }
+  myName = name;
+  localStorage.setItem('randwick_name', myName);
+  hideJoin(); updateMyTag();
+}
+
+function updateMyTag() {
+  const tag = document.getElementById('my-name-tag');
+  if (myName) {
+    tag.style.display='block';
+    document.getElementById('my-name-display').textContent = myName;
+  } else {
+    tag.style.display='none';
+  }
+}
+
+function changeName() {
+  myName=''; localStorage.removeItem('randwick_name');
+  updateMyTag(); showJoin();
+  document.getElementById('join-name').selectedIndex=0;
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────────────────
+function openAdminOverlay()  { document.getElementById('admin-overlay').classList.add('show'); }
+function closeAdminOverlay() { document.getElementById('admin-overlay').classList.remove('show'); document.getElementById('admin-err').textContent=''; }
+function checkAdminPin() {
+  const pin = document.getElementById('admin-pin-input').value;
+  if (pin === ADMIN_PIN) {
+    isAdmin=true; closeAdminOverlay();
+    document.querySelector('.btn-admin').textContent='✅ Admin Active';
+    render();
+  } else {
+    document.getElementById('admin-err').textContent='Wrong PIN. Try again.';
+  }
+}
+
+// ── SUPABASE LOAD ──────────────────────────────────────────────────────────
+async function loadAll() {
+  const [{ data: tData }, { data: rData }] = await Promise.all([
+    sb.from('tippers').select('*').order('created_at'),
+    sb.from('results').select('*').order('race_num'),
+  ]);
+  tippers = tData || [];
+  // normalise results into array indexed by race index
+  results = Array(10).fill(null).map((_,i) => {
+    const r = (rData||[]).find(r=>r.race_num===i+1);
+    return r || { race_num:i+1, winner:'', sp:'' };
+  });
+  render();
+}
+
+// ── SUPABASE REALTIME ──────────────────────────────────────────────────────
+function subscribeRealtime() {
+  sb.channel('randwick-live')
+    .on('postgres_changes', { event:'*', schema:'public', table:'tippers' }, () => loadAll())
+    .on('postgres_changes', { event:'*', schema:'public', table:'results' }, () => loadAll())
+    .subscribe(status => {
+      const bar = document.getElementById('conn-bar');
+      if (status==='SUBSCRIBED') {
+        bar.className='connected';
+        bar.innerHTML='<span class="sync-dot"></span>Live — updates in real time';
+      } else if (status==='CLOSED'||status==='CHANNEL_ERROR') {
+        bar.className='error'; bar.textContent='⚠ Connection lost — refresh to reconnect';
+      }
+    });
+}
+
+// ── SAVE PICK (debounced) ──────────────────────────────────────────────────
+function savePick(tipper, ri, value) {
+  tipper.picks[ri] = value;
+  // optimistic local update
+  render();
+  clearTimeout(saveTimers[tipper.name]);
+  saveTimers[tipper.name] = setTimeout(async () => {
+    await sb.from('tippers').update({ picks: tipper.picks }).eq('id', tipper.id);
+  }, 600);
+}
+
+async function saveResult(ri, field, value) {
+  results[ri][field] = value;
+  render();
+  const upsertData = { race_num: ri+1, winner: results[ri].winner, sp: results[ri].sp };
+  await sb.from('results').upsert(upsertData, { onConflict: 'race_num' });
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
 function buildHeader() {
-  const hRow = document.getElementById("race-header-row");
-  const nRow = document.getElementById("race-names-row");
+  const hRow = document.getElementById('race-header-row');
+  const nRow = document.getElementById('race-names-row');
   while (hRow.children.length > 2) hRow.removeChild(hRow.children[1]);
   while (nRow.children.length > 2) nRow.removeChild(nRow.children[1]);
-
-  const lastH = hRow.lastElementChild;
-  const lastN = nRow.lastElementChild;
-
-  RACES.forEach((r, ri) => {
-    const th = document.createElement("th");
-    th.innerHTML = `<span class="race-num">R${r.num}</span><span class="race-time">${r.time}</span>`;
-    hRow.insertBefore(th, lastH);
-
-    const th2 = document.createElement("th");
-    th2.className = "name-edit";
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.value = state.raceNames[ri] || r.name;
-    inp.placeholder = r.name;
-    inp.addEventListener("input", e => { state.raceNames[ri] = e.target.value; });
-    th2.appendChild(inp);
-    nRow.insertBefore(th2, lastN);
+  const lastH = hRow.lastElementChild, lastN = nRow.lastElementChild;
+  RACES.forEach((r,ri) => {
+    const th = document.createElement('th');
+    th.innerHTML=`<span class="race-num">R${r.num}</span><span class="race-time">${r.time}</span>`;
+    hRow.insertBefore(th,lastH);
+    const th2=document.createElement('th'); th2.className='name-edit';
+    th2.textContent=r.name; nRow.insertBefore(th2,lastN);
   });
 }
 
-// ── BUILD BODY ────────────────────────────────────────────────────────────
-function buildBody() {
-  const tbody = document.getElementById("grid-body");
-  tbody.innerHTML = "";
+function render() {
+  const tbody = document.getElementById('grid-body');
+  tbody.innerHTML = '';
+  const myTipper = tippers.find(t=>norm(t.name)===norm(myName));
 
-  // ── Player rows
-  state.players.forEach((p, pi) => {
-    const tr = document.createElement("tr");
-    tr.className = "player-row";
+  tippers.forEach(tipper => {
+    const isMe = norm(tipper.name)===norm(myName);
+    const picks = tipper.picks || Array(10).fill('');
+    const tr = document.createElement('tr');
+    tr.className = 'player-row' + (isMe?' is-me':'');
 
     // Name
-    const nameTd = document.createElement("td");
-    nameTd.className = "player-name";
-    const nameInp = document.createElement("input");
-    nameInp.type = "text"; nameInp.value = p; nameInp.placeholder = "Player name";
-    nameInp.addEventListener("input", e => { state.players[pi] = e.target.value; refresh(); });
-    nameTd.appendChild(nameInp);
+    const nameTd = document.createElement('td');
+    nameTd.className='player-name';
+    nameTd.textContent = tipper.name + (isMe?' ✏️':'');
     tr.appendChild(nameTd);
 
-    // Picks
-    RACES.forEach((r, ri) => {
-      const td = document.createElement("td");
-      td.className = "pick-cell";
-      td.id = `cell-${pi}-${ri}`;
+    // Pick cells
+    RACES.forEach((r,ri) => {
+      const td = document.createElement('td');
+      td.className='pick-cell'; td.id=`cell-${tipper.id}-${ri}`;
+      const res = results[ri];
+      const hit = res&&res.winner&&res.sp&&isHit(picks[ri],res.winner);
+      if (hit) { td.classList.add('hit'); }
 
-      const hInp = document.createElement("input");
-      hInp.type = "text"; hInp.className = "horse-pick";
-      hInp.value = state.picks[pi][ri].horse; hInp.placeholder = "Horse…";
-      hInp.addEventListener("input", e => { state.picks[pi][ri].horse = e.target.value; refresh(); });
-      td.appendChild(hInp);
+      if (isMe) {
+        // editable input for my row
+        const inp = document.createElement('input');
+        inp.type='text'; inp.className='horse-pick';
+        inp.value=picks[ri]||''; inp.placeholder='Horse…';
+        inp.addEventListener('input', e => savePick(tipper, ri, e.target.value));
+        td.appendChild(inp);
+      } else {
+        // read-only display for others
+        const div = document.createElement('div');
+        div.className='pick-readonly'; div.textContent=picks[ri]||'';
+        td.appendChild(div);
+      }
 
-      const badge = document.createElement("div");
-      badge.className = "pts-badge"; badge.id = `badge-${pi}-${ri}`;
+      const badge = document.createElement('div');
+      badge.className='pts-badge';
+      if (hit) badge.textContent=`+${spToPoints(res.sp).toLocaleString()} pts`;
       td.appendChild(badge);
 
       tr.appendChild(td);
     });
 
-    // Total
-    const totTd = document.createElement("td");
-    totTd.className = "total-cell"; totTd.id = `total-${pi}`; totTd.textContent = "—";
+    // Points total
+    const totTd = document.createElement('td');
+    totTd.className='total-cell'; totTd.id=`total-${tipper.id}`;
+    const pts = playerPoints(picks);
+    totTd.textContent = pts>0?pts.toLocaleString():'—';
     tr.appendChild(totTd);
 
     tbody.appendChild(tr);
   });
 
-  // ── Winner row
-  const winRow = document.createElement("tr");
-  winRow.className = "winner-row";
+  // Mark leader
+  const scores = tippers.map(t=>playerPoints(t.picks||[]));
+  const maxScore = Math.max(...scores,0);
+  tippers.forEach((t,i)=>{
+    const el=document.getElementById(`total-${t.id}`);
+    if(el) el.classList.toggle('leader', scores[i]===maxScore&&maxScore>0);
+  });
 
-  const lbl = document.createElement("td");
-  lbl.className = "winner-label"; lbl.innerHTML = "🏆 Winner &amp; SP";
-  winRow.appendChild(lbl);
+  // Winner row
+  const winRow = document.createElement('tr');
+  winRow.className='winner-row';
+  const lbl=document.createElement('td'); lbl.className='winner-label';
+  lbl.innerHTML='🏆 Winner &amp; SP'; winRow.appendChild(lbl);
 
-  RACES.forEach((r, ri) => {
-    const td = document.createElement("td");
-    td.className = "winner-cell";
+  RACES.forEach((r,ri)=>{
+    const td=document.createElement('td'); td.className='winner-cell';
+    const res=results[ri]||{winner:'',sp:''};
 
-    const wInp = document.createElement("input");
-    wInp.type = "text"; wInp.className = "winner-horse";
-    wInp.value = state.results[ri].winner; wInp.placeholder = "Winner…";
-    wInp.addEventListener("input", e => { state.results[ri].winner = e.target.value; refresh(); });
+    const wInp=document.createElement('input');
+    wInp.type='text'; wInp.className='winner-horse';
+    wInp.value=res.winner||''; wInp.placeholder='Winner…';
+    wInp.disabled=!isAdmin;
+    wInp.addEventListener('input',e=>saveResult(ri,'winner',e.target.value));
     td.appendChild(wInp);
 
-    const spInp = document.createElement("input");
-    spInp.type = "text"; spInp.inputMode = "decimal"; spInp.className = "winner-sp";
-    spInp.value = state.results[ri].sp; spInp.placeholder = "SP $…";
-    spInp.addEventListener("input", e => { state.results[ri].sp = e.target.value; refresh(); });
+    const spInp=document.createElement('input');
+    spInp.type='text'; spInp.inputMode='decimal'; spInp.className='winner-sp';
+    spInp.value=res.sp||''; spInp.placeholder='SP $…';
+    spInp.disabled=!isAdmin;
+    spInp.addEventListener('input',e=>saveResult(ri,'sp',e.target.value));
     td.appendChild(spInp);
 
-    const fml = document.createElement("div");
-    fml.className = "pts-formula"; fml.id = `fml-${ri}`;
+    const fml=document.createElement('div'); fml.className='pts-formula';
+    fml.textContent=res.sp?`= ${spToPoints(res.sp).toLocaleString()} pts`:'';
     td.appendChild(fml);
 
     winRow.appendChild(td);
   });
-
-  const emptyTd = document.createElement("td");
-  winRow.appendChild(emptyTd);
+  const emptyTd=document.createElement('td'); winRow.appendChild(emptyTd);
   tbody.appendChild(winRow);
 
-  refresh();
+  // Stats
+  const buyin=parseFloat(document.getElementById('buyin').value)||25;
+  const pot=buyin*tippers.length;
+  document.getElementById('pot-val').textContent=`$${pot}`;
+  document.getElementById('stat-pot').textContent=`$${pot}`;
+  document.getElementById('stat-players').textContent=tippers.length;
+  const done=results.filter(r=>r&&r.winner&&r.sp).length;
+  document.getElementById('stat-races').textContent=`${done}/10`;
+  const li=scores.indexOf(maxScore);
+  document.getElementById('stat-leader').textContent=maxScore>0?(tippers[li]?.name||'—'):'—';
+  document.getElementById('stat-score').textContent=maxScore>0?maxScore.toLocaleString():'—';
+
+  updateLeaderboard(scores,pot);
 }
 
-// ── REFRESH ───────────────────────────────────────────────────────────────
-function refresh() {
-  // Formula hints in winner row
-  RACES.forEach((r, ri) => {
-    const el = document.getElementById(`fml-${ri}`);
-    if (!el) return;
-    const pts = state.results[ri].sp ? spToPoints(state.results[ri].sp) : 0;
-    el.textContent = pts ? `= ${pts.toLocaleString()} pts` : "";
-  });
-
-  // Pick cells
-  state.players.forEach((_, pi) => {
-    RACES.forEach((r, ri) => {
-      const cell  = document.getElementById(`cell-${pi}-${ri}`);
-      const badge = document.getElementById(`badge-${pi}-${ri}`);
-      if (!cell || !badge) return;
-
-      const res = state.results[ri];
-      const hit = !!(res.winner && res.sp && isHit(state.picks[pi][ri].horse, res.winner));
-      const wasHit = cell.classList.contains("hit");
-
-      cell.classList.toggle("hit", hit);
-
-      if (hit) {
-        badge.textContent = `+${spToPoints(res.sp).toLocaleString()} pts`;
-        if (!wasHit) { cell.style.animation="none"; cell.offsetHeight; cell.style.animation=""; }
-      } else {
-        badge.textContent = "";
-      }
-    });
-  });
-
-  // Totals
-  const scores = state.players.map((_, pi) => playerPoints(pi));
-  const maxScore = Math.max(...scores, 0);
-
-  scores.forEach((s, pi) => {
-    const el = document.getElementById(`total-${pi}`);
-    if (!el) return;
-    el.textContent = s > 0 ? s.toLocaleString() : "—";
-    el.classList.toggle("leader", s === maxScore && maxScore > 0);
-  });
-
-  // Banner stats
-  const buyin = parseFloat(document.getElementById("buyin").value) || 25;
-  const pot = buyin * state.players.length;
-  document.getElementById("pot-val").textContent = `$${pot}`;
-  document.getElementById("stat-pot").textContent = `$${pot}`;
-  document.getElementById("stat-players").textContent = state.players.length;
-  const done = state.results.filter(r => r.winner && r.sp).length;
-  document.getElementById("stat-races").textContent = `${done} / 10`;
-  const li = scores.indexOf(maxScore);
-  document.getElementById("stat-leader").textContent = maxScore > 0 ? (state.players[li] || "—") : "—";
-  document.getElementById("stat-score").textContent = maxScore > 0 ? maxScore.toLocaleString() : "—";
-
-  updateLeaderboard(scores, pot);
-}
-
-function updateLeaderboard(scores, pot) {
-  const ranked = state.players
-    .map((name, pi) => ({ name: name||`Player ${pi+1}`, score: scores[pi], wins: playerWins(pi) }))
-    .sort((a,b) => b.score - a.score || b.wins - a.wins);
-
-  const list = document.getElementById("lb-list");
-  list.innerHTML = "";
-  ["🥇","🥈","🥉"].forEach((t,i) => {
-    if (!ranked[i]) return;
-  });
-
-  ranked.forEach((p, i) => {
-    const div = document.createElement("div");
-    div.className = "lb-row" + (i===0 && p.score>0 ? " rank-1" : "");
-    const trophy = i<3 && p.score>0 ? ["🥇","🥈","🥉"][i] : "";
-    div.innerHTML = `
+function updateLeaderboard(scores,pot) {
+  const ranked=tippers
+    .map((t,i)=>({name:t.name,score:scores[i],wins:playerWins(t.picks||[])}))
+    .sort((a,b)=>b.score-a.score||b.wins-a.wins);
+  const list=document.getElementById('lb-list'); list.innerHTML='';
+  const trophies=['🥇','🥈','🥉'];
+  ranked.forEach((p,i)=>{
+    const div=document.createElement('div');
+    div.className='lb-row'+(i===0&&p.score>0?' rank-1':'');
+    div.innerHTML=`
       <span class="lb-rank">${i+1}</span>
-      <span class="lb-trophy">${trophy}</span>
+      <span class="lb-trophy">${i<3&&p.score>0?trophies[i]:''}</span>
       <span class="lb-name">${p.name}</span>
-      ${p.wins>0 ? `<span class="lb-wins">${p.wins} win${p.wins>1?"s":""}</span>` : ""}
-      <span class="lb-score">${p.score>0 ? p.score.toLocaleString() : "—"}</span>
-      ${i===0 && p.score>0 ? `<span class="lb-payout">wins $${pot}</span>` : ""}
+      ${p.wins>0?`<span class="lb-wins">${p.wins} win${p.wins>1?'s':''}</span>`:''}
+      <span class="lb-score">${p.score>0?p.score.toLocaleString():'—'}</span>
+      ${i===0&&p.score>0?`<span class="lb-payout">wins $${pot}</span>`:''}
     `;
     list.appendChild(div);
   });
 }
 
-function addPlayer() {
-  const n = state.players.length + 1;
-  state.players.push(`Player ${n}`);
-  state.picks.push(RACES.map(() => ({ horse:"" })));
-  buildBody();
+function toggleBuyinEdit() {
+  const bar=document.querySelector('.meta-bar');
+  bar.style.display=bar.style.display==='none'?'flex':'flex';
+  document.getElementById('buyin').focus();
 }
 
-function saveState() {
-  try { localStorage.setItem("randwick2026", JSON.stringify(state)); alert("Saved! ✅"); }
-  catch(e) { alert("Save failed — localStorage unavailable in this context."); }
-}
-function loadState() {
-  try {
-    const s = localStorage.getItem("randwick2026");
-    if (!s) { alert("No saved data found."); return; }
-    const d = JSON.parse(s);
-    state.players=d.players||state.players; state.picks=d.picks||state.picks;
-    state.results=d.results||state.results; state.raceNames=d.raceNames||state.raceNames;
-    buildHeader(); buildBody(); alert("Loaded! ✅");
-  } catch(e) { alert("Load failed."); }
-}
-function resetAll() {
-  if (!confirm("Reset everything?")) return;
-  initState(); buildHeader(); buildBody();
-}
+document.getElementById('buyin').addEventListener('input', render);
+document.getElementById('admin-pin-input').addEventListener('keydown', e=>{ if(e.key==='Enter') checkAdminPin(); });
 
-document.getElementById("buyin").addEventListener("input", refresh);
-
-initState(); buildHeader(); buildBody();
+// ── INIT ───────────────────────────────────────────────────────────────────
+async function init() {
+  buildHeader();
+  await loadAll();
+  subscribeRealtime();
+  updateMyTag();
+  if (!myName) { showJoin(); }
+}
+init();
 </script>
 </body>
 </html>
