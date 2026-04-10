@@ -149,7 +149,7 @@
   thead tr.race-header th.total-col { color:var(--gold-lt); font-weight:900; font-size:0.7rem; min-width:72px; }
 
   thead tr.race-names th { padding:0.12rem 0.32rem 0.4rem; text-align:center; }
-  thead tr.race-names th.name-edit { font-family:'DM Mono',monospace; font-size:0.54rem; color:rgba(201,168,76,0.6); }
+  thead tr.race-names th.name-edit { font-family:'DM Mono',monospace; font-size:0.54rem; color:rgba(201,168,76,0.6); white-space:nowrap; }
 
   tbody tr.player-row { border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.12s; }
   tbody tr.player-row:hover { background:rgba(255,255,255,0.02); }
@@ -159,11 +159,11 @@
   tbody td.player-name { text-align:left; padding-left:0.8rem; font-weight:500; font-size:0.8rem; white-space:nowrap; }
 
   /* Pick cells */
-  .pick-cell { position:relative; padding:0.28rem 0.26rem; }
+  .pick-cell { position:relative; padding:0.28rem 0.4rem; }
   .pick-cell input.horse-pick {
     background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
     border-radius:5px; color:var(--cream); font-family:'DM Sans',sans-serif;
-    font-size:0.68rem; width:82px; padding:4px 5px; text-align:center;
+    font-size:0.68rem; width:100px; padding:4px 6px; text-align:center;
     outline:none; display:block;
     transition:border-color 0.15s, background 0.15s;
   }
@@ -180,7 +180,7 @@
   .pick-readonly {
     font-family:'DM Sans',sans-serif; font-size:0.68rem; color:var(--cream);
     background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.07);
-    border-radius:5px; padding:4px 5px; display:block; width:82px;
+    border-radius:5px; padding:4px 6px; display:block; width:100px;
     text-align:center; min-height:24px; white-space:nowrap;
     overflow:hidden; text-overflow:ellipsis;
   }
@@ -202,7 +202,7 @@
   .winner-cell input.winner-horse {
     background:rgba(201,168,76,0.09); border:1px solid rgba(201,168,76,0.38);
     border-radius:5px; color:var(--gold-lt); font-family:'DM Sans',sans-serif;
-    font-size:0.68rem; width:82px; padding:4px 5px; text-align:center;
+    font-size:0.68rem; width:100px; padding:4px 6px; text-align:center;
     outline:none; display:block; font-weight:600; margin:0 auto;
   }
   .winner-cell input.winner-horse:disabled { opacity:0.45; cursor:not-allowed; }
@@ -493,20 +493,51 @@ function subscribeRealtime() {
     });
 }
 
-// ── SAVE PICK (debounced) ──────────────────────────────────────────────────
+// ── SAVE PICK (debounced, no re-render) ───────────────────────────────────
 function savePick(tipper, ri, value) {
   tipper.picks[ri] = value;
-  // optimistic local update
-  render();
+  // just update the hit state for this one cell, don't re-render the whole table
+  updateCell(tipper, ri);
+  updateScoreCell(tipper);
   clearTimeout(saveTimers[tipper.name]);
   saveTimers[tipper.name] = setTimeout(async () => {
     await sb.from('tippers').update({ picks: tipper.picks }).eq('id', tipper.id);
-  }, 600);
+  }, 800);
+}
+
+function updateCell(tipper, ri) {
+  const cell = document.getElementById(`cell-${tipper.id}-${ri}`);
+  if (!cell) return;
+  const res = results[ri];
+  const hit = res && res.winner && res.sp && isHit(tipper.picks[ri], res.winner);
+  cell.classList.toggle('hit', !!hit);
+  const badge = cell.querySelector('.pts-badge');
+  if (badge) badge.textContent = hit ? `+${spToPoints(res.sp).toLocaleString()} pts` : '';
+}
+
+function updateScoreCell(tipper) {
+  const el = document.getElementById(`total-${tipper.id}`);
+  if (!el) return;
+  const pts = playerPoints(tipper.picks || []);
+  el.textContent = pts > 0 ? pts.toLocaleString() : '—';
+  // recompute leader highlight
+  const scores = tippers.map(t => playerPoints(t.picks || []));
+  const maxScore = Math.max(...scores, 0);
+  tippers.forEach(t => {
+    const e = document.getElementById(`total-${t.id}`);
+    if (e) e.classList.toggle('leader', playerPoints(t.picks||[]) === maxScore && maxScore > 0);
+  });
+  updateLeaderboard(scores, (parseFloat(document.getElementById('buyin').value)||25) * tippers.length);
 }
 
 async function saveResult(ri, field, value) {
   results[ri][field] = value;
-  render();
+  // update formula hint
+  const fml = document.getElementById(`fml-${ri}`);
+  if (fml) fml.textContent = results[ri].sp ? `= ${spToPoints(results[ri].sp).toLocaleString()} pts` : '';
+  // update all cells in this race column
+  tippers.forEach(tipper => updateCell(tipper, ri));
+  tippers.forEach(tipper => updateScoreCell(tipper));
   const upsertData = { race_num: ri+1, winner: results[ri].winner, sp: results[ri].sp };
   await sb.from('results').upsert(upsertData, { onConflict: 'race_num' });
 }
